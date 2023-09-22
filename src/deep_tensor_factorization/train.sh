@@ -1,0 +1,1 @@
+python train.py --valid_cell_type nk --epoch 100

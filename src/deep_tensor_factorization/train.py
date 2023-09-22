@@ -5,12 +5,17 @@ import numpy as np
 import pandas as pd
 import warnings
 import torch
-from datetime import datetime
+import logging
 
 from model import DeepTensorFactorization
 from dataset import get_dataloader
-from utils import set_seed, get_cell_type_compound_gene
+from utils import set_seed, get_cell_type_compound_gene, compute_mean_row_wise_root_mse
 import config
+
+logging.basicConfig(
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S')
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
@@ -35,49 +40,16 @@ def parse_args():
     return parser.parse_args()
 
 
-def compute_mean_row_wise_root_mse(model, df, device, cell_types, compounds, genes):
-    model.eval()
-    dataloader = get_dataloader(df=df, 
-                                cell_types=cell_types, 
-                                compounds=compounds,
-                                genes=genes,
-                                batch_size=10000,
-                                num_workers=2,
-                                drop_last=False,
-                                shuffle=False,
-                                train=False)
-    
-    preds = list()
-    for (cell_type_indices, compound_indices, gene_indices) in dataloader:
-        cell_type_indices = cell_type_indices.to(device)
-        compound_indices = compound_indices.to(device)
-        gene_indices = gene_indices.to(device)
-
-        pred = model(cell_type_indices, compound_indices, gene_indices).detach().cpu().view(-1).tolist()
-        preds.append(pred)
-        
-    df['predict'] = np.concatenate(preds)
-    df['diff'] = (df['target'] - df['predict']) ** 2
-    df = df.drop(['gene', 'target', 'predict'], axis=1)
-    grouped = df.groupby(['cell_type', 'sm_name'])
-    df = grouped.mean()
-    mrrmse = np.mean(np.sqrt(df['diff']))
-    
-    return mrrmse
-
-
 def train(model, dataloader, criterion, optimizer, device):
     model.train()
     
     train_loss = 0.0
+    cell_types, compunds, genes, targets, preds = list(), list(), list(), list(), list()
     for (cell_type_indices, compound_indices, gene_indices, target) in dataloader:
-        cell_type_indices = cell_type_indices.to(device)
-        compound_indices = compound_indices.to(device)
-        gene_indices = gene_indices.to(device)
-        target = target.to(device)
-
-        pred = model(cell_type_indices, compound_indices, gene_indices)
-        loss = criterion(pred.view(-1), target)
+        pred = model(cell_type_indices.to(device), 
+                     compound_indices.to(device), 
+                     gene_indices.to(device))
+        loss = criterion(pred.view(-1), target.to(device))
         
         optimizer.zero_grad()
         loss.backward()
@@ -85,8 +57,55 @@ def train(model, dataloader, criterion, optimizer, device):
         
         train_loss += loss.item() / len(dataloader)
         
-    return train_loss
+        # collect data to compute mrrmse
+        cell_types.append(cell_type_indices.view(-1).tolist())
+        compunds.append(compound_indices.view(-1).tolist())
+        genes.append(gene_indices.view(-1).tolist())
+        targets.append(target.view(-1).tolist())
+        preds.append(pred.detach().cpu().view(-1).tolist())
         
+    df = pd.DataFrame(data={'cell_type': np.concatenate(cell_types),
+                            'sm_name': np.concatenate(compunds),
+                            'gene': np.concatenate(genes),
+                            'target': np.concatenate(targets),
+                            'predict': np.concatenate(preds)})
+    
+    mrrmse = compute_mean_row_wise_root_mse(df)
+    
+    return train_loss, mrrmse
+        
+     
+def valid(model, dataloader, criterion, device):
+    model.eval()
+    
+    valid_loss = 0.0
+    cell_types, compunds, genes, targets, preds = list(), list(), list(), list(), list()
+    for (cell_type_indices, compound_indices, gene_indices, target) in dataloader:
+        pred = model(cell_type_indices.to(device), 
+                     compound_indices.to(device), 
+                     gene_indices.to(device))
+        
+        loss = criterion(pred.view(-1), target.to(device))
+        
+        valid_loss += loss.item() / len(dataloader)
+        
+        # collect data to compute mrrmse
+        cell_types.append(cell_type_indices.view(-1).tolist())
+        compunds.append(compound_indices.view(-1).tolist())
+        genes.append(gene_indices.view(-1).tolist())
+        targets.append(target.view(-1).tolist())
+        preds.append(pred.detach().cpu().view(-1).tolist())
+        
+
+    df = pd.DataFrame(data={'cell_type': np.concatenate(cell_types),
+                            'sm_name': np.concatenate(compunds),
+                            'gene': np.concatenate(genes),
+                            'target': np.concatenate(targets),
+                            'predict': np.concatenate(preds)})
+    
+    mrrmse = compute_mean_row_wise_root_mse(df)
+    
+    return valid_loss, mrrmse      
         
 def main():
     args = parse_args()
@@ -95,14 +114,8 @@ def main():
     set_seed(args.seed)
 
     # Setup CUDA, GPU
-    if not torch.cuda.is_available():
-        print("cuda is not available")
-        exit(0)
-    else:
-        device = torch.device("cuda")
-    
-    #
-    print(f'Validation cell type: {args.valid_cell_type}')
+    device = torch.device("cuda")
+    logging.info(f'Validation cell type: {args.valid_cell_type}')
     
     # Setup model
     cell_types, compounds, genes = get_cell_type_compound_gene()
@@ -112,11 +125,10 @@ def main():
                                     genes=genes)
     model.to(device)
     model_path = os.path.join(config.MODEL_PATH,
-                              f'valid_cell_type_{args.valid_cell_type}_.pth')
+                              f'valid_cell_type_{args.valid_cell_type}.pth')
     
     # Setup data
-    current_time = datetime.now().strftime('%m/%d/%Y, %H:%M:%S')
-    print(f"loading data: {current_time}")
+    logging.info(f'Loading data')
     
     df_train = pd.read_csv(f"{config.RESULTS_DIR}/df_train_{args.valid_cell_type}.csv") 
     df_valid = pd.read_csv(f"{config.RESULTS_DIR}/df_valid_{args.valid_cell_type}.csv") 
@@ -132,6 +144,16 @@ def main():
                                   drop_last=True,
                                   shuffle=True,
                                   train=True)
+    
+    valid_loader = get_dataloader(df=df_valid, 
+                                  cell_types=cell_types, 
+                                  compounds=compounds,
+                                  genes=genes,
+                                  batch_size=10000,
+                                  num_workers=2,
+                                  drop_last=False,
+                                  shuffle=False,
+                                  train=True)
 
     # Setup loss and optimizer
     criterion = torch.nn.MSELoss()
@@ -139,32 +161,27 @@ def main():
                                  lr=3e-4,
                                  weight_decay=1e-5)
     
-    current_time = datetime.now().strftime('%m/%d/%Y, %H:%M:%S')
-    print(f'training started: {current_time}')
+    logging.info(f'Training started')
+    best_valid_mrrmse = 100
     for epoch in range(args.epochs):
-        train_loss = train(
+        train_loss, train_mrrmse = train(
             dataloader=train_loader,
             model=model,
             criterion=criterion,
             optimizer=optimizer,
             device=device)
         
-        train_mrrmse = compute_mean_row_wise_root_mse(model=model, 
-                                                      df=df_train, 
-                                                      device=device,
-                                                      cell_types=cell_types,
-                                                      compounds=compounds,
-                                                      genes=genes)
+        valid_loss, valid_mrrmse = valid(
+            dataloader=valid_loader,
+            model=model,
+            criterion=criterion,
+            device=device)
         
-        valid_mrrmse = compute_mean_row_wise_root_mse(model=model,
-                                                      df=df_valid,
-                                                      device=device,
-                                                      cell_types=cell_types,
-                                                      compounds=compounds,
-                                                      genes=genes)
+        logging.info(f"Epoch: {epoch}; training loss: {train_loss: .5f}; validation loss: {valid_loss: .5f}; training MRRMSE: {train_mrrmse: .5f}; valid MRRMSE: {valid_mrrmse: .5f};")
         
-        current_time = datetime.now().strftime('%m/%d/%Y, %H:%M:%S')
-        print(f"{current_time}; epoch: {epoch}; training loss: {train_loss: .2f}; training MRRMSE: {train_mrrmse: .2f}; validation MRRMSE: {valid_mrrmse: .2f}")
+        if valid_mrrmse < best_valid_mrrmse:
+            torch.save(model.state_dict(), model_path)
         
+ 
 if __name__ == "__main__":
     main()
