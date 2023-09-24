@@ -5,6 +5,7 @@ import torch
 import pandas as pd
 
 import config
+from model import DeepTensorFactorization
 
 def set_seed(seed):
     random.seed(seed)
@@ -75,3 +76,23 @@ def get_submission(df: pd.DataFrame) -> pd.DataFrame:
     df.index.names = ['id']
     
     return df
+
+
+def load_model_from_check_point(model, model_path: str=None):
+    """
+    Load model from check point for training
+
+    Parameters
+    ----------
+    model_path : str, optional
+        _description_, by default None
+
+    Returns
+    -------
+    DeepTensorFactorization
+        _description_
+    """
+    
+    
+    
+    return NotImplementedError

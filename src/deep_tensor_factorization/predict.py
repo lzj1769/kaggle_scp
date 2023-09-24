@@ -67,7 +67,15 @@ def main():
     
     model_path = os.path.join(config.MODEL_PATH,
                               f'valid_cell_type_{args.valid_cell_type}.pth')
-    model.load_state_dict(torch.load(model_path))
+    
+    state_dict = torch.load(model_path)
+    model.load_state_dict(state_dict['state_dict'])
+        
+    train_loss = state_dict['train_loss']
+    valid_loss = state_dict['valid_loss']
+    train_mrrmse = state_dict['train_mrrmse']
+    valid_mrrmse = state_dict['valid_mrrmse']
+    
     model.to(device)
 
     df_test = pd.read_csv(f"{config.RESULTS_DIR}/test.csv") 
@@ -83,7 +91,9 @@ def main():
 
     df_test['predict'] = predict(model=model, dataloader=test_loader, device=device)
     df_submission = get_submission(df_test)
-    df_submission.to_csv(f"{config.SUBMISSION_PATH}/valid_cell_type_{args.valid_cell_type}.csv")
+
+    filename = f'{args.valid_cell_type}_train_loss_{train_loss:.03f}_valid_loss_{valid_loss:.03f}_train_mrrmse_{train_mrrmse:.03f}_valid_mrrmse_{valid_mrrmse:.03f}.csv'
+    df_submission.to_csv(f"{config.SUBMISSION_PATH}/{filename}")
 
 if __name__ == "__main__":
     main()

@@ -66,4 +66,3 @@ class DeepTensorFactorization(torch.nn.Module):
     @property
     def get_gene_embedding(self):
         return self.gene_embedding.weight.detach().numpy()
-        

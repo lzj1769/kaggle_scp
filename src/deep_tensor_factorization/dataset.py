@@ -78,37 +78,5 @@ def get_dataloader(df: pd.DataFrame, cell_types: list,
                             persistent_workers=True)
     
     return dataloader
-
-
-# def get_dataloader(df_train, df_valid, cell_types, compounds, genes, drop_last, shuffle):
-#     train_dataset = SingleCellPerturbationDataset(df=df_train, 
-#                                                   cell_types=cell_types, 
-#                                                   compounds=compounds, 
-#                                                   genes=genes, 
-#                                                   train=True)
-    
-#     train_dataloader = DataLoader(dataset=train_dataset,
-#                              batch_size=10000,
-#                              num_workers=2,
-#                              pin_memory=True,
-#                              shuffle=True,
-#                              drop_last=True,
-#                              persistent_workers=True)
-    
-#     valid_dataset = SingleCellPerturbationDataset(df=df_valid, 
-#                                                   cell_types=cell_types, 
-#                                                   compounds=compounds, 
-#                                                   genes=genes, 
-#                                                   train=True)
-    
-#     valid_dataloader = DataLoader(dataset=valid_dataset,
-#                              batch_size=10000,
-#                              num_workers=2,
-#                              pin_memory=True,
-#                              shuffle=False,
-#                              drop_last=False,
-#                              persistent_workers=True)
-    
-#     return train_dataloader, valid_dataloader
     
     

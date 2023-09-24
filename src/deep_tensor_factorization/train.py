@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument("--resume",
                         action="store_true",
                         help='training model from check point')
-    parser.add_argument("--batch_size", default=10000, type=int,
+    parser.add_argument("--batch_size", default=50000, type=int,
                         help="Batch size.")
     parser.add_argument("--epochs", default=100, type=int,
                         help="Total number of training epochs to perform.")
@@ -109,7 +109,8 @@ def valid(model, dataloader, criterion, device):
     mrrmse = compute_mrrmse(df)
     
     return valid_loss, mrrmse      
-        
+
+   
 def main():
     args = parse_args()
 
@@ -130,9 +131,17 @@ def main():
                               f'valid_cell_type_{args.valid_cell_type}.pth')
     
     if args.resume:
-        logging.info(f'Loading model from check point')
-        model.load_state_dict(torch.load(model_path))
-    
+        state_dict = torch.load(model_path)
+        model.load_state_dict(state_dict['state_dict'])
+        
+        train_loss = state_dict['train_loss']
+        valid_loss = state_dict['valid_loss']
+        train_mrrmse = state_dict['train_mrrmse']
+        valid_mrrmse = state_dict['valid_mrrmse']
+        
+        logging.info(f'Loading model from check point!')
+        logging.info(f'Train loss: {train_loss: .03f}; valid loss: {valid_loss: .03f}; train mrrmse: {train_mrrmse: .03f}; valid mrrmse: {valid_mrrmse: .03f}')
+        
     model.to(device)
     
     # Setup data
@@ -178,7 +187,12 @@ def main():
     tb_writer = SummaryWriter(log_dir=log_dir)
         
     logging.info(f'Training started')
-    best_valid_mrrmse = 100
+    
+    if args.resume:
+        best_valid_mrrmse = valid_mrrmse
+    else:
+        best_valid_mrrmse = 100
+        
     for epoch in range(args.epochs):
         train_loss, train_mrrmse = train(
             dataloader=train_loader,
