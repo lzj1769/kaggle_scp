@@ -5,3 +5,5 @@ scripts
 model
 submission
 notebooks
+src/deep_tensor_factorization/.ipynb_checkpoints/
+src/deep_tensor_factorization/log/

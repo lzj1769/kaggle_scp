@@ -29,7 +29,21 @@ def get_cell_type_compound_gene():
     return cell_types, compounds, genes
 
 
-def compute_mean_row_wise_root_mse(df):
+def compute_mrrmse(df: pd.DataFrame) -> np.float32:
+    """
+    Compute Mean Rowwise Root Mean Squared Error
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe. Should be formated as cell_type|sm_name|genetarget|predict
+
+    Returns
+    -------
+    np.float32
+        mmrmse
+    """
+    
     df['diff'] = (df['target'] - df['predict']) ** 2
     df = df.drop(['gene', 'target', 'predict'], axis=1)
     grouped = df.groupby(['cell_type', 'sm_name'])
@@ -38,13 +52,26 @@ def compute_mean_row_wise_root_mse(df):
     
     return mrrmse
 
-def get_submission(df_pred):
-    df_pred.sort_values(['cell_type', 'sm_name'], inplace=True)
-    df_pred = df_pred.pivot(index=['cell_type', 'sm_name'], columns='gene', values='predict')
+def get_submission(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Convert dataframe from long to wide format for submission
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input dataframe formated as cell_type|sm_name|predict
+
+    Returns
+    -------
+    pd.DataFrame
+        Output dataframe for submission
+    """
+    df.sort_values(['cell_type', 'sm_name'], inplace=True)
+    df = df.pivot(index=['cell_type', 'sm_name'], columns='gene', values='predict')
     
-    df_pred.reset_index(inplace=True)
+    df.reset_index(inplace=True)
     
-    df_pred.drop(['cell_type', 'sm_name'], axis=1, inplace=True)
-    df_pred.index.names = ['id']
+    df.drop(['cell_type', 'sm_name'], axis=1, inplace=True)
+    df.index.names = ['id']
     
-    return df_pred
+    return df

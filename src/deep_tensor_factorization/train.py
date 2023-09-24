@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from model import DeepTensorFactorization
 from dataset import get_dataloader
-from utils import set_seed, get_cell_type_compound_gene, compute_mean_row_wise_root_mse
+from utils import set_seed, get_cell_type_compound_gene, compute_mrrmse
 import config
 
 logging.basicConfig(
@@ -34,7 +34,7 @@ def parse_args():
     parser.add_argument("--resume",
                         action="store_true",
                         help='training model from check point')
-    parser.add_argument("--batch_size", default=50000, type=int,
+    parser.add_argument("--batch_size", default=10000, type=int,
                         help="Batch size.")
     parser.add_argument("--epochs", default=100, type=int,
                         help="Total number of training epochs to perform.")
@@ -73,7 +73,7 @@ def train(model, dataloader, criterion, optimizer, device):
                             'target': np.concatenate(targets),
                             'predict': np.concatenate(preds)})
     
-    mrrmse = compute_mean_row_wise_root_mse(df)
+    mrrmse = compute_mrrmse(df)
     
     return train_loss, mrrmse
         
@@ -106,7 +106,7 @@ def valid(model, dataloader, criterion, device):
                             'target': np.concatenate(targets),
                             'predict': np.concatenate(preds)})
     
-    mrrmse = compute_mean_row_wise_root_mse(df)
+    mrrmse = compute_mrrmse(df)
     
     return valid_loss, mrrmse      
         
@@ -126,9 +126,14 @@ def main():
     model = DeepTensorFactorization(cell_types=cell_types,
                                     compounds=compounds,
                                     genes=genes)
-    model.to(device)
     model_path = os.path.join(config.MODEL_PATH,
                               f'valid_cell_type_{args.valid_cell_type}.pth')
+    
+    if args.resume:
+        logging.info(f'Loading model from check point')
+        model.load_state_dict(torch.load(model_path))
+    
+    model.to(device)
     
     # Setup data
     logging.info(f'Loading data')
@@ -194,8 +199,13 @@ def main():
         tb_writer.add_scalar("Vliad MRRMSE", valid_mrrmse, epoch)
             
         if valid_mrrmse < best_valid_mrrmse:
-            torch.save(model.state_dict(), model_path)
             best_valid_mrrmse = valid_mrrmse
+            state = {'state_dict': model.state_dict(),
+                     'train_loss': train_loss,
+                     'valid_loss': valid_loss,
+                     'train_mrrmse': train_mrrmse,
+                     'valid_mrrmse': valid_mrrmse}
+            torch.save(state, model_path)
         
     logging.info(f'Training finished')
  
