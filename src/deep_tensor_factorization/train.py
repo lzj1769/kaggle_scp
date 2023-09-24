@@ -6,6 +6,7 @@ import pandas as pd
 import warnings
 import torch
 import logging
+from torch.utils.tensorboard import SummaryWriter
 
 from model import DeepTensorFactorization
 from dataset import get_dataloader
@@ -33,6 +34,8 @@ def parse_args():
     parser.add_argument("--resume",
                         action="store_true",
                         help='training model from check point')
+    parser.add_argument("--batch_size", default=50000, type=int,
+                        help="Batch size.")
     parser.add_argument("--epochs", default=100, type=int,
                         help="Total number of training epochs to perform.")
     parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
@@ -139,9 +142,9 @@ def main():
                                   cell_types=cell_types, 
                                   compounds=compounds,
                                   genes=genes,
-                                  batch_size=10000,
+                                  batch_size=args.batch_size,
                                   num_workers=2,
-                                  drop_last=True,
+                                  drop_last=False,
                                   shuffle=True,
                                   train=True)
     
@@ -149,7 +152,7 @@ def main():
                                   cell_types=cell_types, 
                                   compounds=compounds,
                                   genes=genes,
-                                  batch_size=10000,
+                                  batch_size=args.batch_size,
                                   num_workers=2,
                                   drop_last=False,
                                   shuffle=False,
@@ -161,6 +164,14 @@ def main():
                                  lr=3e-4,
                                  weight_decay=1e-5)
     
+    """ Train the model """
+    log_prefix = f'valid_cell_type_{args.valid_cell_type}'
+    log_dir = os.path.join(config.TRAINING_LOG_PATH,
+                           log_prefix)
+    
+
+    tb_writer = SummaryWriter(log_dir=log_dir)
+        
     logging.info(f'Training started')
     best_valid_mrrmse = 100
     for epoch in range(args.epochs):
@@ -177,11 +188,16 @@ def main():
             criterion=criterion,
             device=device)
         
-        logging.info(f"Epoch: {epoch}; training loss: {train_loss: .5f}; validation loss: {valid_loss: .5f}; training MRRMSE: {train_mrrmse: .5f}; valid MRRMSE: {valid_mrrmse: .5f};")
-        
+        tb_writer.add_scalar("Training loss", train_loss, epoch)
+        tb_writer.add_scalar("Valid loss", valid_loss, epoch)
+        tb_writer.add_scalar("Trianing MRRMSE", train_mrrmse, epoch)
+        tb_writer.add_scalar("Vliad MRRMSE", valid_mrrmse, epoch)
+            
         if valid_mrrmse < best_valid_mrrmse:
             torch.save(model.state_dict(), model_path)
+            best_valid_mrrmse = valid_mrrmse
         
+    logging.info(f'Training finished')
  
 if __name__ == "__main__":
     main()

@@ -4,6 +4,7 @@ DE_TRAIN = "/data/pinello/PROJECTS/2023_08_ZL/kaggle_scp/data/de_train.parquet"
 
 # Model
 MODEL_PATH = '/data/pinello/PROJECTS/2023_08_ZL/kaggle_scp/model/deep_tensor_factorization'
+TRAINING_LOG_PATH = '/data/pinello/PROJECTS/2023_08_ZL/kaggle_scp/src/deep_tensor_factorization/log'
 
 # Submission
 SUBMISSION_PATH = '/data/pinello/PROJECTS/2023_08_ZL/kaggle_scp/submission/deep_tensor_factorization'
