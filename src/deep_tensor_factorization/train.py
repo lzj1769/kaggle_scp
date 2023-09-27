@@ -6,6 +6,7 @@ import pandas as pd
 import warnings
 import torch
 import logging
+from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
 
 from model import DeepTensorFactorization
@@ -175,11 +176,12 @@ def main():
     # Setup loss and optimizer
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(),
-                                 lr=3e-4,
-                                 weight_decay=1e-5)
+                                 lr=1e-3,
+                                 weight_decay=1e-4)
     
     """ Train the model """
-    log_prefix = f'valid_cell_type_{args.valid_cell_type}'
+    dt_string = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
+    log_prefix = f'valid_cell_type_{args.valid_cell_type}_{dt_string}'
     log_dir = os.path.join(config.TRAINING_LOG_PATH,
                            log_prefix)
     

@@ -11,7 +11,7 @@ class DeepTensorFactorization(torch.nn.Module):
                  n_cell_type_factors: int=4, 
                  n_compounds_factors: int=16, 
                  n_gene_factors: int=128,
-                 n_hiddens: int=1024,
+                 n_hiddens: int=2048,
                  dropout: float=0.5):
         super().__init__()
         
