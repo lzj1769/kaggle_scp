@@ -83,7 +83,7 @@ def main():
                                   cell_types=cell_types, 
                                   compounds=compounds,
                                   genes=genes,
-                                  batch_size=10000,
+                                  batch_size=50000,
                                   num_workers=2,
                                   drop_last=False,
                                   shuffle=False,

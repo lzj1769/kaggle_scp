@@ -28,7 +28,7 @@ def parse_args():
 
     # Required parameters
     parser.add_argument("--valid_cell_type", type=str, default='nk',
-                        help="Which cell type for validation. Available options are: nk,  t_cd4, t_cd8, t_reg")
+                        help="Which cell type used for validation. Available options are: nk,  t_cd4, t_cd8, t_reg")
     parser.add_argument("--log",
                         action="store_true",
                         help='write training history')
@@ -36,9 +36,14 @@ def parse_args():
                         action="store_true",
                         help='training model from check point')
     parser.add_argument("--batch_size", default=50000, type=int,
-                        help="Batch size.")
+                        help="Batch size. Default 5000")
     parser.add_argument("--epochs", default=100, type=int,
-                        help="Total number of training epochs to perform.")
+                        help="Total number of training epochs to perform. Default: 100")
+    parser.add_argument("--lr", default=1e-03, type=float,
+                        help="Learning rate. Default: 0.001")
+    parser.add_argument("--freeze_embedding", 
+                        action="store_true",
+                        help="Freeze weight for embedding layer. Set it to true after 1st phase training")
     parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
 
     return parser.parse_args()
@@ -175,9 +180,16 @@ def main():
 
     # Setup loss and optimizer
     criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(),
+    
+    if args.freeze_embedding:
+        model.cell_type_embedding.weight.requires_grad = False
+        model.compound_embedding.weight.requires_grad = False
+        model.gene_embedding.weight.requires_grad = False
+
+    optimizer = torch.optim.Adam([param for param in model.parameters() if param.requires_grad == True],
                                  lr=1e-3,
                                  weight_decay=1e-4)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', min_lr=1e-5)
     
     """ Train the model """
     dt_string = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
@@ -222,6 +234,8 @@ def main():
                      'train_mrrmse': train_mrrmse,
                      'valid_mrrmse': valid_mrrmse}
             torch.save(state, model_path)
+            
+        scheduler.step(valid_loss)
         
     logging.info(f'Training finished')
  
