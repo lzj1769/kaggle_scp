@@ -5,7 +5,6 @@ import torch
 import pandas as pd
 
 import config
-from model import DeepTensorFactorization
 
 def set_seed(seed):
     random.seed(seed)
