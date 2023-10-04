@@ -23,16 +23,6 @@ if not sys.warnoptions:
     warnings.simplefilter("ignore")
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-
-    # Required parameters
-    parser.add_argument("--valid_cell_type", type=str, default='nk',
-                        help="Which cell type for validation. Available options are: nk,  t_cd4, t_cd8, t_reg")
-
-    return parser.parse_args()
-
-
 def predict(model, dataloader, device):
     model.eval()
 
@@ -52,8 +42,6 @@ def predict(model, dataloader, device):
 
 
 def main():
-    args = parse_args()
-
     # set random seed
     set_seed(42)
 
