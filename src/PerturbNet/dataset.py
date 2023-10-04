@@ -1,12 +1,6 @@
-import os
-import pandas as pd
 from typing import List, Optional
 import numpy as np
-import torch
-import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-
-import config
 
 class SingleCellPerturbationDataset(Dataset):
     def __init__(self, 
@@ -22,9 +16,14 @@ class SingleCellPerturbationDataset(Dataset):
         if y is not None:
             self.y = y.astype(np.float32)
             
-        self.cell_types = cell_types.astype(np.int32)
-        self.compounds = compounds.astype(np.int32)
-        self.genes = genes.astype(np.int32)
+        if cell_types is not None:
+            self.cell_types = cell_types.astype(np.int32)
+            
+        if compounds is not None:  
+            self.compounds = compounds.astype(np.int32)
+            
+        if genes is not None:
+            self.genes = genes.astype(np.int32)
         self.train = train
         
         self.n_samples = self.x.shape[0]

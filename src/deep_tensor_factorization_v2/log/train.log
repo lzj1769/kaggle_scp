@@ -1,0 +1,16 @@
+2023-09-27 17:45:57 INFO     Validation cell type: t_cd4
+2023-09-27 17:45:57 INFO     Validation cell type: t_cd8
+2023-09-27 17:45:57 INFO     Validation cell type: t_reg
+2023-09-27 17:45:57 INFO     Validation cell type: nk
+2023-09-27 17:46:07 INFO     Loading data
+2023-09-27 17:46:08 INFO     Loading data
+2023-09-27 17:46:08 INFO     Loading data
+2023-09-27 17:46:08 INFO     Loading data
+2023-09-27 17:46:15 INFO     Training started
+2023-09-27 17:46:16 INFO     Training started
+2023-09-27 17:46:16 INFO     Training started
+2023-09-27 17:46:16 INFO     Training started
+2023-09-28 14:07:48 INFO     Training finished
+2023-09-28 14:13:22 INFO     Training finished
+2023-09-28 14:13:44 INFO     Training finished
+2023-09-28 14:29:28 INFO     Training finished

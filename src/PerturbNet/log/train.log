@@ -1,3 +1,28 @@
-2023-09-28 22:09:01 INFO     Validation cell type: nk
-2023-09-28 22:09:01 INFO     Loading data
-2023-09-28 22:10:19 INFO     Training started
+2023-10-03 16:47:10 INFO     Validation cell type: nk
+2023-10-03 16:47:10 INFO     Loading data
+2023-10-03 16:47:11 INFO     Validation cell type: t_cd4
+2023-10-03 16:47:11 INFO     Loading data
+2023-10-03 16:47:11 INFO     Validation cell type: t_cd8
+2023-10-03 16:47:11 INFO     Loading data
+2023-10-03 16:47:11 INFO     Validation cell type: t_reg
+2023-10-03 16:47:11 INFO     Loading data
+2023-10-03 16:47:38 INFO     Standarizing the features
+2023-10-03 16:47:43 INFO     Standarizing the features
+2023-10-03 16:47:44 INFO     Standarizing the features
+2023-10-03 16:47:45 INFO     Standarizing the features
+2023-10-03 16:48:32 INFO     Number of training samples: 8613803; number of features: 148
+2023-10-03 16:48:32 INFO     Number of validation samples: 2349219; number of features: 148
+2023-10-03 16:48:39 INFO     Number of training samples: 8650225; number of features: 148
+2023-10-03 16:48:39 INFO     Number of validation samples: 2312797; number of features: 148
+2023-10-03 16:48:40 INFO     Number of training samples: 8613803; number of features: 148
+2023-10-03 16:48:40 INFO     Number of validation samples: 2349219; number of features: 148
+2023-10-03 16:48:41 INFO     Number of training samples: 8613803; number of features: 148
+2023-10-03 16:48:41 INFO     Number of validation samples: 2349219; number of features: 148
+2023-10-03 16:48:44 INFO     Training started
+2023-10-03 16:48:45 INFO     Training started
+2023-10-03 16:48:47 INFO     Training started
+2023-10-03 16:48:48 INFO     Training started
+2023-10-03 19:06:03 INFO     Training finished
+2023-10-03 19:06:11 INFO     Training finished
+2023-10-03 19:08:31 INFO     Training finished
+2023-10-03 19:12:13 INFO     Training finished

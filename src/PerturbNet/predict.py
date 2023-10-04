@@ -7,10 +7,11 @@ import warnings
 import torch
 import logging
 from tqdm import tqdm
+from sklearn.preprocessing import StandardScaler
 
 from model import PerturbNet
 from dataset import get_dataloader
-from utils import set_seed, get_cell_type_compound_gene, get_submission
+from utils import set_seed, get_submission
 import config
 
 logging.basicConfig(
@@ -21,28 +22,29 @@ logging.basicConfig(
 
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
-    
-    
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
 
     # Required parameters
-    parser.add_argument("--valid_cell_type", type=str, default='nk',
-                        help="Which cell type for validation. Available options are: nk,  t_cd4, t_cd8, t_reg")
-    
+    parser.add_argument("--use_ChemBERTa", action="store_true", type=bool, default=False,
+                        help="If use features from ChemBERTa")
+    parser.add_argument("--scale_feature", action="store_true", type=bool, default=True,
+                        help="If standardize the input features. Default: True")
     return parser.parse_args()
 
 
 def predict(model, dataloader, device):
     model.eval()
-    
+
     preds = list()
     for x in tqdm(dataloader):
         pred = model(x.to(device)).detach().cpu().view(-1).tolist()
         preds.append(pred)
 
     preds = np.concatenate(preds)
-    
+
     return preds
 
 
@@ -53,47 +55,91 @@ def main():
     set_seed(42)
 
     device = torch.device("cuda")
-    
-    # Setup model
-    cell_types, compounds, genes = get_cell_type_compound_gene()
-    
-    model = PerturbNet()
-    model_path = os.path.join(config.MODEL_PATH,
-                              f'valid_cell_type_{args.valid_cell_type}.pth')
-    
-    state_dict = torch.load(model_path)
-    model.load_state_dict(state_dict['state_dict'])
+
+    df_submission_list = []
+    avg_train_loss, avg_train_mrrmse, avg_valid_loss, avg_valid_mrrmse = 0, 0, 0, 0
+
+    for cell_type in ['nk', 't_cd4', 't_cd8', 't_reg']:
+        logging.info(f"Predicting with cell type as validation: {cell_type}")
         
-    train_loss = state_dict['train_loss']
-    valid_loss = state_dict['valid_loss']
-    train_mrrmse = state_dict['train_mrrmse']
-    valid_mrrmse = state_dict['valid_mrrmse']
-    
-    model.to(device)
+        # load test data
+        test_deep_tf = np.load(
+            f"{config.RESULTS_DIR}/deep_tf/test_{cell_type}.npz")
 
-    df_test = pd.read_csv(f"{config.RESULTS_DIR}/test.csv") 
-    test_loader = get_dataloader(df=df_test, 
-                                  cell_types=cell_types, 
-                                  compounds=compounds,
-                                  genes=genes,
-                                  batch_size=50000,
-                                  num_workers=2,
-                                  drop_last=False,
-                                  shuffle=False,
-                                  train=False)
+        test_x = test_deep_tf['x']
 
-    # predict target
-    model.eval()
-    preds = list()
-    for x in tqdm(test_loader):
-        pred = model(x.to(device)).detach().cpu().view(-1).tolist()
-        preds.append(pred)
+        # concatentate molecular features from ChemBERTa
+        # if args.use_ChemBERTa:
+        #     logging.info(f'Loading molecular features from ChemBERTa')
+        #     test_ChemBERTa = np.load(
+        #         f"{config.RESULTS_DIR}/ChemBERTa/test.npz")
 
-    df_test['predict'] = np.concatenate(preds)
-    df_submission = get_submission(df_test)
+        #     test_x = np.concatenate([test_x, test_ChemBERTa['x']], axis=1)
 
-    filename = f'{args.valid_cell_type}_train_loss_{train_loss:.03f}_valid_loss_{valid_loss:.03f}_train_mrrmse_{train_mrrmse:.03f}_valid_mrrmse_{valid_mrrmse:.03f}.csv'
-    df_submission.to_csv(f"{config.SUBMISSION_PATH}/{filename}")
+        if args.scale_feature:
+            logging.info('Standarizing the features')
+            train_deep_tf = np.load(
+                f"{config.RESULTS_DIR}/deep_tf/train_{cell_type}.npz")
+            valid_deep_tf = np.load(
+                f"{config.RESULTS_DIR}/deep_tf/valid_{cell_type}.npz")
+
+            train_x, valid_x = train_deep_tf['x'], valid_deep_tf['x']
+            scaler = StandardScaler()
+            scaler.fit(X=np.concatenate([train_x, valid_x], axis=0))
+            test_x = scaler.transform(test_x)
+
+        logging.info(
+            f'Number of test samples: {test_x.shape[0]}; number of features: {test_x.shape[1]}')
+
+        test_loader = get_dataloader(x=test_x,
+                                    num_workers=2,
+                                    drop_last=False,
+                                    shuffle=False,
+                                    train=False)
+
+        # Setup model
+        model = PerturbNet(n_input=test_x.shape[1])
+        model_path = os.path.join(config.MODEL_PATH,
+                                f'valid_cell_type_{cell_type}.pth')
+
+        state_dict = torch.load(model_path)
+        model.load_state_dict(state_dict['state_dict'])
+
+        train_loss = state_dict['train_loss']
+        valid_loss = state_dict['valid_loss']
+        train_mrrmse = state_dict['train_mrrmse']
+        valid_mrrmse = state_dict['valid_mrrmse']
+
+        model.to(device)
+
+        # predict target
+        df_test = pd.read_csv("../../results/deep_tensor_factorization/test.csv")
+        model.eval()
+        preds = list()
+        for x in tqdm(test_loader):
+            pred = model(x.to(device)).detach().cpu().view(-1).tolist()
+            preds.append(pred)
+
+        df_test['predict'] = np.concatenate(preds)
+        df_submission = get_submission(df_test)
+
+        filename = f'{cell_type}_train_loss_{train_loss:.03f}_train_mrrmse_{train_mrrmse:.03f}_valid_loss_{valid_loss:.03f}_valid_mrrmse_{valid_mrrmse:.03f}.csv'
+        df_submission.to_csv(f"{config.SUBMISSION_PATH}/{filename}")
+        
+        df_submission_list.append(df_submission)
+        
+        avg_train_loss += train_loss / 4
+        avg_train_mrrmse += train_mrrmse / 4
+        avg_valid_loss += valid_loss / 4
+        avg_valid_mrrmse += valid_mrrmse / 4
+        
+    # get average submission
+    df_avg_submission = sum(
+        df_submission_list) / len(df_submission_list)
+
+    filename = f'avg_train_loss_{avg_train_loss:.03f}_train_mrrmse_{avg_train_mrrmse:.03f}_valid_loss_{avg_valid_loss:.03f}_valid_mrrmse_{avg_valid_mrrmse:.03f}.csv'
+    df_avg_submission.to_csv(f"{config.SUBMISSION_PATH}/{filename}")
+
 
 if __name__ == "__main__":
     main()
