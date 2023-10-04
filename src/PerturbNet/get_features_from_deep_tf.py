@@ -15,7 +15,42 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S')
 
 
-def get_data(model_path, df, cell_types, compounds, genes, get_target=True):
+def get_data(model_path: str = None, 
+             df: pd.DataFrame = None, 
+             cell_types: list = None, 
+             compounds: list = None,
+             genes: list = None,
+             get_target=True):
+    """
+    Extract embedding of cell types, compounds, and genes from the trained model.
+    These embeddings are concatenated as input features for model fine-tuning.
+
+    Parameters
+    ----------
+    model_path : str, optional
+        Path of trained model, by default None
+        
+    df : pd.DataFrame, optional
+        Input data frame. Should be formated as cell_type | compound | gene, by default None
+    
+    cell_types : list, optional
+        _description_, by default None
+    
+    compounds : list, optional
+        _description_, by default None
+    
+    genes : list, optional
+        _description_, by default None
+    
+    get_target : bool, optional
+        _description_, by default True
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+
     state_dict = torch.load(model_path)
 
     # get embedding for cell type, compound, and gene
@@ -70,11 +105,10 @@ def main():
         logging.info(f'Loading training data')
         df_train = pd.read_csv(f'../../results/deep_tensor_factorization/df_train_{cell_type}.csv',
                                index_col=0)
-
-        # remove control compound from training data
-        df_train = df_train[~df_train['sm_name'].isin(
-            ['Dabrafenib', 'Belinostat'])]
-        df_train = df_train.reset_index(drop=True)
+        # # remove control compound from training data
+        # df_train = df_train[~df_train['sm_name'].isin(
+        #     ['Dabrafenib', 'Belinostat'])]
+        # df_train = df_train.reset_index(drop=True)
 
         x, y, cell_type_idxs, compound_idxs, gene_idxs = get_data(model_path=model_path,
                                                                   df=df_train,
@@ -92,11 +126,6 @@ def main():
         logging.info(f'Loading validation data')
         df_valid = pd.read_csv(f'../../results/deep_tensor_factorization/df_valid_{cell_type}.csv',
                                index_col=0)
-        
-        # remove control compound from validation data
-        df_valid = df_valid[~df_valid['sm_name'].isin(
-            ['Dabrafenib', 'Belinostat'])]
-        df_valid = df_valid.reset_index(drop=True)
 
         x, y, cell_type_idxs, compound_idxs, gene_idxs = get_data(model_path=model_path,
                                                                   df=df_valid,
@@ -112,7 +141,8 @@ def main():
         # test data
         # there are no control compounds in test data
         logging.info(f'Loading test data')
-        df_test = f'../../results/deep_tensor_factorization/test.csv'
+        df_test = pd.read_csv(f'../../results/deep_tensor_factorization/test.csv',
+                               index_col=0)
         x, cell_type_idxs, compound_idxs, gene_idxs = get_data(model_path=model_path,
                                                                df=df_test,
                                                                cell_types=cell_types,
