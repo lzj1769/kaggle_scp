@@ -69,7 +69,7 @@ def get_data(model_path: str = None,
     cell_type_idxs = np.zeros(n_samples)
     compound_idxs = np.zeros(n_samples)
     gene_idxs = np.zeros(n_samples)
-    for i in tqdm(range(n_samples)):
+    for i in range(n_samples):
         cell_type_idx = cell_types.index(df['cell_type'][i])
         compound_idx = compounds.index(df['sm_name'][i])
         gene_idx = genes.index(df['gene'][i])

@@ -136,14 +136,6 @@ def main():
     train_x, train_y = train_deep_tf['x'], train_deep_tf['y']
     valid_x, valid_y = valid_deep_tf['x'], valid_deep_tf['y']
 
-    # feature standarization
-    if args.scale_feature: 
-        logging.info('Standarizing the features')
-        scaler = StandardScaler()
-        scaler.fit(X=np.concatenate([train_x, valid_x], axis=0))
-        train_x = scaler.transform(train_x)
-        valid_x = scaler.transform(valid_x)
-        
     # concatentate molecular features from ChemBERTa
     if args.use_ChemBERTa:
         logging.info(f'Loading molecular features from ChemBERTa')
@@ -154,19 +146,27 @@ def main():
 
         train_x = np.concatenate([train_x, train_ChemBERTa['x']], axis=1)
         valid_x = np.concatenate([valid_x, valid_ChemBERTa['x']], axis=1)
-        
+
+    # feature standarization
+    if args.scale_feature:
+        logging.info('Standarizing the features')
+        scaler = StandardScaler()
+        scaler.fit(X=np.concatenate([train_x, valid_x], axis=0))
+        train_x = scaler.transform(train_x)
+        valid_x = scaler.transform(valid_x)
+
     logging.info(
         f'Number of training samples: {train_x.shape[0]}; number of features: {train_x.shape[1]}')
     logging.info(
         f'Number of validation samples: {valid_x.shape[0]}; number of features: {valid_x.shape[1]}')
-    
+
     train_loader = get_dataloader(x=train_x,
                                   y=train_y,
                                   cell_types=train_deep_tf['cell_types'],
                                   compounds=train_deep_tf['compounds'],
                                   genes=train_deep_tf['genes'],
                                   batch_size=args.batch_size,
-                                  num_workers=2,
+                                  num_workers=1,
                                   drop_last=False,
                                   shuffle=True,
                                   train=True)
@@ -177,7 +177,7 @@ def main():
                                   compounds=valid_deep_tf['compounds'],
                                   genes=valid_deep_tf['genes'],
                                   batch_size=args.batch_size,
-                                  num_workers=2,
+                                  num_workers=1,
                                   drop_last=False,
                                   shuffle=False,
                                   train=True)
@@ -185,21 +185,7 @@ def main():
     # Setup model
     model = PerturbNet(n_input=train_x.shape[1])
     model_path = os.path.join(config.MODEL_PATH,
-                              f'valid_cell_type_{args.valid_cell_type}.pth')
-
-    if args.resume:
-        state_dict = torch.load(model_path)
-        model.load_state_dict(state_dict['state_dict'])
-
-        train_loss = state_dict['train_loss']
-        valid_loss = state_dict['valid_loss']
-        train_mrrmse = state_dict['train_mrrmse']
-        valid_mrrmse = state_dict['valid_mrrmse']
-
-        logging.info(f'Loading model from check point!')
-        logging.info(
-            f'Train loss: {train_loss: .03f}; valid loss: {valid_loss: .03f}; train mrrmse: {train_mrrmse: .03f}; valid mrrmse: {valid_mrrmse: .03f}')
-
+                              f'{args.valid_cell_type}.pth')
     model.to(device)
 
     # Setup loss and optimizer
@@ -212,19 +198,12 @@ def main():
 
     """ Train the model """
     dt_string = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    log_prefix = f'{args.valid_cell_type}_{dt_string}'
     log_dir = os.path.join(config.TRAINING_LOG_PATH,
-                           log_prefix)
-
+                           f'{args.valid_cell_type}_{dt_string}')
     tb_writer = SummaryWriter(log_dir=log_dir)
 
     logging.info(f'Training started')
-
-    if args.resume:
-        best_valid_mrrmse = valid_mrrmse
-    else:
-        best_valid_mrrmse = 100
-
+    best_valid_mrrmse = 100
     for epoch in range(args.epochs):
         train_loss, train_mrrmse = train(
             dataloader=train_loader,
