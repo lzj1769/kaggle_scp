@@ -95,7 +95,7 @@ def main():
         if args.scale_feature:
             logging.info('Standarizing the features')
             scaler = StandardScaler()
-            scaler.fit(X=np.concatenate([train_x, valid_x], axis=0))
+            scaler.fit(X=np.concatenate([train_x, valid_x, test_x], axis=0))
             test_x = scaler.transform(test_x)
 
         logging.info(
