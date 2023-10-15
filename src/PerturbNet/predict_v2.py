@@ -30,7 +30,7 @@ def parse_args():
     # Required parameters
     parser.add_argument("--use_ChemBERTa", action="store_true", default=False,
                         help="If use features from ChemBERTa")
-    parser.add_argument("--scale_feature", action="store_true", default=True,
+    parser.add_argument("--scale_feature", action="store_true", default=False,
                         help="If standardize the input features. Default: True")
     parser.add_argument("--seed", type=int, default=42,
                         help="random seed for initialization")
@@ -65,32 +65,15 @@ def main():
         logging.info(f"Predicting with cell type as validation: {cell_type}")
 
         # load test data
-        test_deep_tf = np.load(
-            f"{config.RESULTS_DIR}/deep_tf/test_{cell_type}.npz")
-
+        test_deep_tf = np.load(f"{config.RESULTS_DIR}/deep_tf/test.npz")
         test_x = test_deep_tf['x']
-
+        
         train_deep_tf = np.load(
                 f"{config.RESULTS_DIR}/deep_tf/train_{cell_type}.npz")
         valid_deep_tf = np.load(
                 f"{config.RESULTS_DIR}/deep_tf/valid_{cell_type}.npz")
         
         train_x, valid_x = train_deep_tf['x'], valid_deep_tf['x']
-        
-        # concatentate molecular features from ChemBERTa
-        if args.use_ChemBERTa:
-            logging.info(f'Loading molecular features from ChemBERTa')
-            test_ChemBERTa = np.load(
-                f"{config.RESULTS_DIR}/ChemBERTa/test.npz")
-
-            test_x = np.concatenate([test_x, test_ChemBERTa['x']], axis=1)
-            train_ChemBERTa = np.load(
-                f"{config.RESULTS_DIR}/ChemBERTa/train_{cell_type}.npz")
-            valid_ChemBERTa = np.load(
-                f"{config.RESULTS_DIR}/ChemBERTa/valid_{cell_type}.npz")
-
-            train_x = np.concatenate([train_x, train_ChemBERTa['x']], axis=1)
-            valid_x = np.concatenate([valid_x, valid_ChemBERTa['x']], axis=1)
 
         if args.scale_feature:
             logging.info('Standarizing the features')
@@ -123,8 +106,7 @@ def main():
         model.to(device)
 
         # predict target
-        df_test = pd.read_csv(
-            "../../results/deep_tensor_factorization/test.csv")
+        df_test = pd.read_csv(f"{config.RESULTS_DIR}/deep_tf/test.csv")
         model.eval()
         preds = list()
         for x in tqdm(test_loader):
@@ -136,6 +118,7 @@ def main():
 
         filename = f'{cell_type}_train_loss_{train_loss:.03f}_train_mrrmse_{train_mrrmse:.03f}_valid_loss_{valid_loss:.03f}_valid_mrrmse_{valid_mrrmse:.03f}.csv'
         df_submission.to_csv(f"{config.SUBMISSION_PATH}/{filename}")
+
         df_submission_list.append(df_submission)
 
         avg_train_loss += train_loss / 4

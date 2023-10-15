@@ -36,7 +36,7 @@ def compute_mrrmse(df: pd.DataFrame) -> np.float32:
     Parameters
     ----------
     df : pd.DataFrame
-        Input dataframe. Should be formated as cell_type|sm_name|genetarget|predict
+        Input dataframe. Should be formated as cell_type|sm_name|gene|target|predict
 
     Returns
     -------

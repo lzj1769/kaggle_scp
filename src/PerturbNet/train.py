@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument("--resume",
                         action="store_true",
                         help='training model from check point')
-    parser.add_argument("--batch_size", default=10000, type=int,
+    parser.add_argument("--batch_size", default=1000, type=int,
                         help="Batch size. Default 5000")
     parser.add_argument("--epochs", default=100, type=int,
                         help="Total number of training epochs to perform. Default: 100")
@@ -80,9 +80,9 @@ def train(model, dataloader, criterion, optimizer, device):
                             'target': np.concatenate(targets),
                             'predict': np.concatenate(preds)})
 
-    mrrmse = compute_mrrmse(df)
+    avg_mrrmse = compute_mrrmse(df)
 
-    return train_loss, mrrmse
+    return train_loss, avg_mrrmse
 
 
 def valid(model, dataloader, criterion, device):
@@ -110,9 +110,9 @@ def valid(model, dataloader, criterion, device):
                             'target': np.concatenate(targets),
                             'predict': np.concatenate(preds)})
 
-    mrrmse = compute_mrrmse(df)
+    avg_mrrmse = compute_mrrmse(df)
 
-    return valid_loss, mrrmse
+    return valid_loss, avg_mrrmse
 
 
 def main():
@@ -133,7 +133,7 @@ def main():
     valid_deep_tf = np.load(
         f"{config.RESULTS_DIR}/deep_tf/valid_{args.valid_cell_type}.npz")
     test_deep_tf = np.load(
-        f"{config.RESULTS_DIR}/deep_tf/test_{args.valid_cell_type}.npz")
+        f"{config.RESULTS_DIR}/deep_tf/test.npz")
 
     train_x, train_y = train_deep_tf['x'], train_deep_tf['y']
     valid_x, valid_y = valid_deep_tf['x'], valid_deep_tf['y']
@@ -151,12 +151,11 @@ def main():
         valid_x = np.concatenate([valid_x, valid_ChemBERTa['x']], axis=1)
 
     # feature standarization
-    if args.scale_feature:
-        logging.info('Standarizing the features')
-        scaler = StandardScaler()
-        scaler.fit(X=np.concatenate([train_x, valid_x, test_x], axis=0))
-        train_x = scaler.transform(train_x)
-        valid_x = scaler.transform(valid_x)
+    logging.info('Standarizing the features')
+    scaler = StandardScaler()
+    scaler.fit(X=np.concatenate([train_x, valid_x, test_x], axis=0))
+    train_x = scaler.transform(train_x)
+    valid_x = scaler.transform(valid_x)
 
     logging.info(
         f'Number of training samples: {train_x.shape[0]}; number of features: {train_x.shape[1]}')
@@ -193,7 +192,7 @@ def main():
 
     # Setup loss and optimizer
     criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.Adam([param for param in model.parameters() if param.requires_grad == True],
+    optimizer = torch.optim.AdamW([param for param in model.parameters() if param.requires_grad == True],
                                  lr=args.lr,
                                  weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
