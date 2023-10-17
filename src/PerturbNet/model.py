@@ -4,7 +4,7 @@ import torch.nn as nn
 class PerturbNet(torch.nn.Module):
     def __init__(self, 
                  n_input: int=148,
-                 n_hiddens: int=1024,
+                 n_hiddens: int=2048,
                  dropout: float=0.5):
         super().__init__()
         

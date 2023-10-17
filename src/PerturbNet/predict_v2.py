@@ -30,8 +30,10 @@ def parse_args():
     # Required parameters
     parser.add_argument("--use_ChemBERTa", action="store_true", default=False,
                         help="If use features from ChemBERTa")
-    parser.add_argument("--scale_feature", action="store_true", default=False,
+    parser.add_argument("--scale_feature", action="store_true", default=True,
                         help="If standardize the input features. Default: True")
+    parser.add_argument("--use_cell_type_umap", action="store_true",
+                        help="If use features from UMAP for cell types")
     parser.add_argument("--seed", type=int, default=42,
                         help="random seed for initialization")
     return parser.parse_args()
@@ -74,6 +76,20 @@ def main():
                 f"{config.RESULTS_DIR}/deep_tf/valid_{cell_type}.npz")
         
         train_x, valid_x = train_deep_tf['x'], valid_deep_tf['x']
+
+
+        if args.use_cell_type_umap:
+            logging.info(f'Loading cell type UMAP features')
+            train_cell_type = np.load(
+                f"{config.RESULTS_DIR}/cell_type_umap/train_{cell_type}.npz")
+            valid_cell_type = np.load(
+                f"{config.RESULTS_DIR}/cell_type_umap/valid_{cell_type}.npz")
+            test_cell_type = np.load(
+                f"{config.RESULTS_DIR}/cell_type_umap/test.npz")
+
+            train_x = np.concatenate([train_x, train_cell_type['x']], axis=1)
+            valid_x = np.concatenate([valid_x, valid_cell_type['x']], axis=1)
+            test_x = np.concatenate([test_x, test_cell_type['x']], axis=1)       
 
         if args.scale_feature:
             logging.info('Standarizing the features')
