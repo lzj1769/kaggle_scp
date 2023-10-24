@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from sklearn.preprocessing import StandardScaler
 
-from model import PerturbNet
+from model import PerturbNet, PerturbNet2
 from dataset import get_dataloader
 from utils import set_seed, compute_mrrmse
 import config
@@ -49,8 +49,8 @@ def parse_args():
     parser.add_argument("--use_deep_tf_v1", action="store_true")
     parser.add_argument("--use_deep_tf_v2", action="store_true")
     parser.add_argument("--use_cell_type_umap", action="store_true")
-    parser.add_argument("--scale_feature", action="store_true",
-                        help="If use features from ChemBERTa")
+    parser.add_argument("--use_chemical_fingerprint", action="store_true")
+    parser.add_argument("--scale_feature", action="store_true")
     return parser.parse_args()
 
 
@@ -160,9 +160,12 @@ def main():
             f"{config.RESULTS_DIR}/ChemBERTa/train_{args.valid_cell_type}.npz")
         valid_ChemBERTa = np.load(
             f"{config.RESULTS_DIR}/ChemBERTa/valid_{args.valid_cell_type}.npz")
+        test_ChemBERTa = np.load(
+            f"{config.RESULTS_DIR}/ChemBERTa/test.npz")
 
         train_x = np.concatenate([train_x, train_ChemBERTa['x']], axis=1)
         valid_x = np.concatenate([valid_x, valid_ChemBERTa['x']], axis=1)
+        test_x = np.concatenate([test_x, test_ChemBERTa['x']], axis=1)
         
     if args.use_cell_type_umap:
         logging.info(f'Loading cell type UMAP features')
@@ -177,6 +180,19 @@ def main():
         valid_x = np.concatenate([valid_x, valid_cell_type['x']], axis=1)
         test_x = np.concatenate([test_x, test_cell_type['x']], axis=1)
 
+    if args.use_chemical_fingerprint:
+        logging.info(f'Loading chemical fingerprint')
+        train_cell_type = np.load(
+            f"{config.RESULTS_DIR}/chemical_fingerprint/train_{args.valid_cell_type}.npz")
+        valid_cell_type = np.load(
+            f"{config.RESULTS_DIR}/chemical_fingerprint/valid_{args.valid_cell_type}.npz")
+        test_cell_type = np.load(
+            f"{config.RESULTS_DIR}/chemical_fingerprint/test.npz")
+
+        train_x = np.concatenate([train_x, train_cell_type['x']], axis=1)
+        valid_x = np.concatenate([valid_x, valid_cell_type['x']], axis=1)
+        test_x = np.concatenate([test_x, test_cell_type['x']], axis=1)
+        
     # feature standarization
     logging.info('Standarizing the features')
     scaler = StandardScaler()

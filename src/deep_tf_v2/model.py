@@ -42,10 +42,8 @@ class DeepTensorFactorization(torch.nn.Module):
                                    nn.Linear(self.n_hiddens, self.n_hiddens),
                                    nn.BatchNorm1d(self.n_hiddens),
                                    nn.ReLU(),
-                                   nn.Dropout(self.dropout))
-        
-        self.reg = nn.Linear(self.n_hiddens, 1)
-        self.cls = nn.Linear(self.n_hiddens, 1)
+                                   nn.Dropout(self.dropout),
+                                   nn.Linear(self.n_hiddens, 1))
         
         
     def forward(self, cell_type_indices, compound_indices, gene_indices):
@@ -55,10 +53,8 @@ class DeepTensorFactorization(torch.nn.Module):
         
         x = torch.concat([cell_type_vec, compound_vec, gene_vec], dim=1)
         x = self.model(x)
-        x1 = self.reg(x)
-        x2 = self.cls(x)
         
-        return x1, x2
+        return x
     
     @property
     def get_cell_type_embedding(self):

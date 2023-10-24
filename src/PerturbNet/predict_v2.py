@@ -28,12 +28,15 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # Required parameters
+    parser.add_argument("--use_deep_tf_v1", action="store_true")
+    parser.add_argument("--use_deep_tf_v2", action="store_true")
     parser.add_argument("--use_ChemBERTa", action="store_true", default=False,
                         help="If use features from ChemBERTa")
     parser.add_argument("--scale_feature", action="store_true", default=True,
                         help="If standardize the input features. Default: True")
     parser.add_argument("--use_cell_type_umap", action="store_true",
                         help="If use features from UMAP for cell types")
+    parser.add_argument("--use_chemical_fingerprint", action="store_true")
     parser.add_argument("--seed", type=int, default=42,
                         help="random seed for initialization")
     return parser.parse_args()
@@ -62,22 +65,44 @@ def main():
 
     df_submission_list = []
     avg_train_loss, avg_train_mrrmse, avg_valid_loss, avg_valid_mrrmse = 0, 0, 0, 0
-
     for cell_type in ['nk', 't_cd4', 't_cd8', 't_reg']:
         logging.info(f"Predicting with cell type as validation: {cell_type}")
 
-        # load test data
-        test_deep_tf = np.load(f"{config.RESULTS_DIR}/deep_tf/test.npz")
-        test_x = test_deep_tf['x']
-        
-        train_deep_tf = np.load(
-                f"{config.RESULTS_DIR}/deep_tf/train_{cell_type}.npz")
-        valid_deep_tf = np.load(
-                f"{config.RESULTS_DIR}/deep_tf/valid_{cell_type}.npz")
-        
-        train_x, valid_x = train_deep_tf['x'], valid_deep_tf['x']
+        if args.use_deep_tf_v1:
+            logging.info('Using features from deep_tf_v1')
+            train_deep_tf = np.load(
+                f"{config.RESULTS_DIR}/deep_tf_v1/train_{cell_type}.npz")
+            valid_deep_tf = np.load(
+                f"{config.RESULTS_DIR}/deep_tf_v1/valid_{cell_type}.npz")
+            test_deep_tf = np.load(
+                f"{config.RESULTS_DIR}/deep_tf_v1/test.npz")
 
+        elif args.use_deep_tf_v2:
+            logging.info('Using features from deep_tf_v2')
+            train_deep_tf = np.load(
+                f"{config.RESULTS_DIR}/deep_tf_v2/train_{cell_type}.npz")
+            valid_deep_tf = np.load(
+                f"{config.RESULTS_DIR}/deep_tf_v2/valid_{cell_type}.npz")
+            test_deep_tf = np.load(
+                f"{config.RESULTS_DIR}/deep_tf_v2/test.npz")
 
+        # load data
+        train_x, valid_x, test_x = train_deep_tf['x'], valid_deep_tf['x'], test_deep_tf['x']
+
+        # concatentate molecular features from ChemBERTa
+        if args.use_ChemBERTa:
+            logging.info(f'Loading molecular features from ChemBERTa')
+            train_ChemBERTa = np.load(
+                f"{config.RESULTS_DIR}/ChemBERTa/train_{cell_type}.npz")
+            valid_ChemBERTa = np.load(
+                f"{config.RESULTS_DIR}/ChemBERTa/valid_{cell_type}.npz")
+            test_ChemBERTa = np.load(
+                f"{config.RESULTS_DIR}/ChemBERTa/test.npz")
+
+            train_x = np.concatenate([train_x, train_ChemBERTa['x']], axis=1)
+            valid_x = np.concatenate([valid_x, valid_ChemBERTa['x']], axis=1)
+            test_x = np.concatenate([test_x, test_ChemBERTa['x']], axis=1)
+        
         if args.use_cell_type_umap:
             logging.info(f'Loading cell type UMAP features')
             train_cell_type = np.load(
@@ -89,13 +114,25 @@ def main():
 
             train_x = np.concatenate([train_x, train_cell_type['x']], axis=1)
             valid_x = np.concatenate([valid_x, valid_cell_type['x']], axis=1)
-            test_x = np.concatenate([test_x, test_cell_type['x']], axis=1)       
+            test_x = np.concatenate([test_x, test_cell_type['x']], axis=1)
+            
+        if args.use_chemical_fingerprint:
+            logging.info(f'Loading chemical fingerprint')
+            train_cell_type = np.load(
+                f"{config.RESULTS_DIR}/chemical_fingerprint/train_{cell_type}.npz")
+            valid_cell_type = np.load(
+                f"{config.RESULTS_DIR}/chemical_fingerprint/valid_{cell_type}.npz")
+            test_cell_type = np.load(
+                f"{config.RESULTS_DIR}/chemical_fingerprint/test.npz")
 
-        if args.scale_feature:
-            logging.info('Standarizing the features')
-            scaler = StandardScaler()
-            scaler.fit(X=np.concatenate([train_x, valid_x, test_x], axis=0))
-            test_x = scaler.transform(test_x)
+            train_x = np.concatenate([train_x, train_cell_type['x']], axis=1)
+            valid_x = np.concatenate([valid_x, valid_cell_type['x']], axis=1)
+            test_x = np.concatenate([test_x, test_cell_type['x']], axis=1)
+
+        logging.info('Standarizing the features')
+        scaler = StandardScaler()
+        scaler.fit(X=np.concatenate([train_x, valid_x, test_x], axis=0))
+        test_x = scaler.transform(test_x)
 
         logging.info(
             f'Number of test samples: {test_x.shape[0]}; number of features: {test_x.shape[1]}')
@@ -132,7 +169,7 @@ def main():
         df_test['predict'] = np.concatenate(preds)
         df_submission = get_submission(df_test)
 
-        filename = f'{cell_type}_train_loss_{train_loss:.03f}_train_mrrmse_{train_mrrmse:.03f}_valid_loss_{valid_loss:.03f}_valid_mrrmse_{valid_mrrmse:.03f}.csv'
+        filename = f'{cell_type}_valid_mrrmse_{valid_mrrmse:.03f}.csv'
         df_submission.to_csv(f"{config.SUBMISSION_PATH}/{filename}")
 
         df_submission_list.append(df_submission)
@@ -146,7 +183,7 @@ def main():
     df_avg_submission = sum(
         df_submission_list) / len(df_submission_list)
 
-    filename = f'avg_train_loss_{avg_train_loss:.03f}_train_mrrmse_{avg_train_mrrmse:.03f}_valid_loss_{avg_valid_loss:.03f}_valid_mrrmse_{avg_valid_mrrmse:.03f}.csv'
+    filename = f'avg_valid_mrrmse_{avg_valid_mrrmse:.03f}.csv'
     df_avg_submission.to_csv(f"{config.SUBMISSION_PATH}/{filename}")
 
 

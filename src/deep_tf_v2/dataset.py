@@ -30,7 +30,7 @@ class SingleCellPerturbationDataset(Dataset):
         target = self.df['target'].values[idx]
         sign = 1 if target > 0 else 0
 
-        return (cell_type_index, compound_index, gene_index, np.abs(target), np.float32(sign))
+        return (cell_type_index, compound_index, gene_index, np.float32(sign))
         
 
 def get_dataloader(df: pd.DataFrame, cell_types: list, 

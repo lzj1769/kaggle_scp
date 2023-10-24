@@ -38,29 +38,24 @@ def parse_args():
     return parser.parse_args()
 
 
-def train(model, dataloader, reg_criterion, cls_criterion, optimizer, device):
+def train(model, dataloader, criterion, optimizer, device):
     model.train()
 
-    train_reg_loss, train_cls_loss = 0.0, 0.0
+    train_loss = 0.0
+    for (cell_type_indices, compound_indices, gene_indices, targets) in dataloader:
+        preds = model(cell_type_indices.to(device),
+                      compound_indices.to(device),
+                      gene_indices.to(device))
 
-    for (cell_type_indices, compound_indices, gene_indices, target_p_value, target_sign) in dataloader:
-        p_value, sign = model(cell_type_indices.to(device),
-                              compound_indices.to(device),
-                              gene_indices.to(device))
-        
-        reg_loss = reg_criterion(p_value.view(-1), target_p_value.to(device))
-        cls_loss = cls_criterion(sign.view(-1), target_sign.to(device))
-
-        loss = reg_loss + cls_loss
+        loss = criterion(preds.view(-1), targets.to(device))
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        train_reg_loss += reg_loss.item() / len(dataloader)
-        train_cls_loss += cls_loss.item() / len(dataloader)
+        train_loss += loss.item() / len(dataloader)
 
-    return train_reg_loss, train_cls_loss
+    return train_loss
 
 
 def main():
@@ -78,7 +73,7 @@ def main():
     model = DeepTensorFactorization(cell_types=cell_types,
                                     compounds=compounds,
                                     genes=genes)
-    model_path = '../../model/deep_embedding/model.pth'
+    model_path = '../../model/deep_tf_v2/model.pth'
     model.to(device)
 
     # Setup data
@@ -97,8 +92,7 @@ def main():
                                   train=True)
 
     # Setup loss and optimizer
-    reg_criterion = torch.nn.MSELoss()
-    cls_criterion = torch.nn.BCEWithLogitsLoss()
+    criterion = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam([param for param in model.parameters() if param.requires_grad == True],
                                  lr=1e-3,
                                  weight_decay=1e-4)
@@ -111,20 +105,17 @@ def main():
 
     logging.info(f'Training started')
     for epoch in range(args.epochs):
-        reg_loss, cls_loss = train(
+        loss = train(
             dataloader=train_loader,
             model=model,
-            reg_criterion=reg_criterion,
-            cls_criterion=cls_criterion,
+            criterion=criterion,
             optimizer=optimizer,
             device=device)
 
-        tb_writer.add_scalar("Regression loss", reg_loss, epoch)
-        tb_writer.add_scalar("Classification mrrmse", cls_loss, epoch)
+        tb_writer.add_scalar("Loss", loss, epoch)
 
         state = {'state_dict': model.state_dict(),
-                 'reg_loss': reg_loss,
-                 'cls_loss': cls_loss}
+                 'loss': loss}
         torch.save(state, model_path)
 
     logging.info(f'Training finished')

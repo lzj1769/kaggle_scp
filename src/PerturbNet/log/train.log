@@ -1,28 +1,28 @@
-2023-10-16 21:05:08 INFO     Validation cell type: t_reg
-2023-10-16 21:05:08 INFO     Loading data
-2023-10-16 21:05:08 INFO     Using features from deep_tf_v2
-2023-10-16 21:05:08 INFO     Validation cell type: t_cd4
-2023-10-16 21:05:08 INFO     Loading data
-2023-10-16 21:05:08 INFO     Using features from deep_tf_v2
-2023-10-16 21:05:08 INFO     Validation cell type: nk
-2023-10-16 21:05:08 INFO     Loading data
-2023-10-16 21:05:08 INFO     Using features from deep_tf_v2
-2023-10-16 21:05:08 INFO     Validation cell type: t_cd8
-2023-10-16 21:05:08 INFO     Loading data
-2023-10-16 21:05:08 INFO     Using features from deep_tf_v2
-2023-10-16 21:05:48 INFO     Standarizing the features
-2023-10-16 21:05:49 INFO     Standarizing the features
-2023-10-16 21:05:49 INFO     Standarizing the features
-2023-10-16 21:05:49 INFO     Standarizing the features
-2023-10-16 21:06:36 INFO     Number of training samples: 9779307; number of features: 148
-2023-10-16 21:06:36 INFO     Number of validation samples: 1402247; number of features: 148
-2023-10-16 21:06:41 INFO     Number of training samples: 9742885; number of features: 148
-2023-10-16 21:06:41 INFO     Number of validation samples: 1438669; number of features: 148
-2023-10-16 21:06:42 INFO     Number of training samples: 9742885; number of features: 148
-2023-10-16 21:06:42 INFO     Number of validation samples: 1438669; number of features: 148
-2023-10-16 21:06:46 INFO     Training started
-2023-10-16 21:06:47 INFO     Number of training samples: 9742885; number of features: 148
-2023-10-16 21:06:47 INFO     Number of validation samples: 1438669; number of features: 148
-2023-10-16 21:06:48 INFO     Training started
-2023-10-16 21:06:48 INFO     Training started
-2023-10-16 21:06:56 INFO     Training started
+2023-10-23 22:50:27 INFO     Validation cell type: t_reg
+2023-10-23 22:50:27 INFO     Validation cell type: nk
+2023-10-23 22:50:27 INFO     Loading data
+2023-10-23 22:50:27 INFO     Using features from deep_tf_v1
+2023-10-23 22:50:27 INFO     Loading data
+2023-10-23 22:50:27 INFO     Using features from deep_tf_v1
+2023-10-23 22:50:27 INFO     Validation cell type: t_cd4
+2023-10-23 22:50:27 INFO     Loading data
+2023-10-23 22:50:27 INFO     Using features from deep_tf_v1
+2023-10-23 22:50:27 INFO     Validation cell type: t_cd8
+2023-10-23 22:50:27 INFO     Loading data
+2023-10-23 22:50:27 INFO     Using features from deep_tf_v1
+2023-10-23 22:51:10 INFO     Standarizing the features
+2023-10-23 22:51:10 INFO     Standarizing the features
+2023-10-23 22:51:11 INFO     Standarizing the features
+2023-10-23 22:51:12 INFO     Standarizing the features
+2023-10-23 22:51:47 INFO     Number of training samples: 9742885; number of features: 148
+2023-10-23 22:51:47 INFO     Number of validation samples: 1438669; number of features: 148
+2023-10-23 22:51:52 INFO     Number of training samples: 9742885; number of features: 148
+2023-10-23 22:51:52 INFO     Number of validation samples: 1438669; number of features: 148
+2023-10-23 22:51:58 INFO     Training started
+2023-10-23 22:51:58 INFO     Training started
+2023-10-23 22:52:04 INFO     Number of training samples: 9742885; number of features: 148
+2023-10-23 22:52:04 INFO     Number of validation samples: 1438669; number of features: 148
+2023-10-23 22:52:04 INFO     Number of training samples: 9779307; number of features: 148
+2023-10-23 22:52:04 INFO     Number of validation samples: 1402247; number of features: 148
+2023-10-23 22:52:09 INFO     Training started
+2023-10-23 22:52:13 INFO     Training started
