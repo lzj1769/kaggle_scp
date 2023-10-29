@@ -1,0 +1,3 @@
+2023-10-29 12:58:32 INFO     Loading data
+2023-10-29 12:58:38 INFO     Training started
+./run_train.sh: line 3: 193022 Terminated              python train.py

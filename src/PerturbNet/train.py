@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument("--resume",
                         action="store_true",
                         help='training model from check point')
-    parser.add_argument("--batch_size", default=1000, type=int,
+    parser.add_argument("--batch_size", default=100, type=int,
                         help="Batch size. Default 5000")
     parser.add_argument("--epochs", default=100, type=int,
                         help="Total number of training epochs to perform. Default: 100")
@@ -45,10 +45,13 @@ def parse_args():
                         help="Learning rate. Default: 0.001")
     parser.add_argument("--seed", type=int, default=42,
                         help="random seed for initialization")
+    
+    parser.add_argument('--deep_tf',
+                        choices=['v1', 'v2', 'v3', 'v4'],
+                        type=str, default='v1')
+
     parser.add_argument("--use_ChemBERTa", action="store_true")
-    parser.add_argument("--use_deep_tf_v1", action="store_true")
-    parser.add_argument("--use_deep_tf_v2", action="store_true")
-    parser.add_argument("--use_cell_type_umap", action="store_true")
+    parser.add_argument("--use_rna_pca", action="store_true")
     parser.add_argument("--use_chemical_fingerprint", action="store_true")
     parser.add_argument("--scale_feature", action="store_true")
     return parser.parse_args()
@@ -130,25 +133,15 @@ def main():
     # Setup data
     logging.info(f'Loading data')
 
+    logging.info(f'Using features from deep_tf_{args.deep_tf}')
+    train_deep_tf = np.load(
+        f"{config.RESULTS_DIR}/deep_tf_{args.deep_tf}/train_{args.valid_cell_type}.npz")
+    valid_deep_tf = np.load(
+        f"{config.RESULTS_DIR}/deep_tf_{args.deep_tf}/valid_{args.valid_cell_type}.npz")
+    test_deep_tf = np.load(
+        f"{config.RESULTS_DIR}/deep_tf_{args.deep_tf}/test.npz")
 
-    if args.use_deep_tf_v1:
-        logging.info('Using features from deep_tf_v1')
-        train_deep_tf = np.load(
-            f"{config.RESULTS_DIR}/deep_tf_v1/train_{args.valid_cell_type}.npz")
-        valid_deep_tf = np.load(
-            f"{config.RESULTS_DIR}/deep_tf_v1/valid_{args.valid_cell_type}.npz")
-        test_deep_tf = np.load(
-            f"{config.RESULTS_DIR}/deep_tf_v1/test.npz")
-        
-    elif args.use_deep_tf_v2:
-        logging.info('Using features from deep_tf_v2')
-        train_deep_tf = np.load(
-            f"{config.RESULTS_DIR}/deep_tf_v2/train_{args.valid_cell_type}.npz")
-        valid_deep_tf = np.load(
-            f"{config.RESULTS_DIR}/deep_tf_v2/valid_{args.valid_cell_type}.npz")
-        test_deep_tf = np.load(
-            f"{config.RESULTS_DIR}/deep_tf_v2/test.npz")
-        
+    # get features
     train_x, train_y = train_deep_tf['x'], train_deep_tf['y']
     valid_x, valid_y = valid_deep_tf['x'], valid_deep_tf['y']
     test_x = test_deep_tf['x']
@@ -166,15 +159,15 @@ def main():
         train_x = np.concatenate([train_x, train_ChemBERTa['x']], axis=1)
         valid_x = np.concatenate([valid_x, valid_ChemBERTa['x']], axis=1)
         test_x = np.concatenate([test_x, test_ChemBERTa['x']], axis=1)
-        
-    if args.use_cell_type_umap:
+
+    if args.use_rna_pca:
         logging.info(f'Loading cell type UMAP features')
         train_cell_type = np.load(
-            f"{config.RESULTS_DIR}/cell_type_umap/train_{args.valid_cell_type}.npz")
+            f"{config.RESULTS_DIR}/cell_type_embedding_rna/train_{args.valid_cell_type}.npz")
         valid_cell_type = np.load(
-            f"{config.RESULTS_DIR}/cell_type_umap/valid_{args.valid_cell_type}.npz")
+            f"{config.RESULTS_DIR}/cell_type_embedding_rna/valid_{args.valid_cell_type}.npz")
         test_cell_type = np.load(
-            f"{config.RESULTS_DIR}/cell_type_umap/test.npz")
+            f"{config.RESULTS_DIR}/cell_type_embedding_rna/test.npz")
 
         train_x = np.concatenate([train_x, train_cell_type['x']], axis=1)
         valid_x = np.concatenate([valid_x, valid_cell_type['x']], axis=1)
@@ -192,7 +185,7 @@ def main():
         train_x = np.concatenate([train_x, train_cell_type['x']], axis=1)
         valid_x = np.concatenate([valid_x, valid_cell_type['x']], axis=1)
         test_x = np.concatenate([test_x, test_cell_type['x']], axis=1)
-        
+
     # feature standarization
     logging.info('Standarizing the features')
     scaler = StandardScaler()
@@ -211,7 +204,7 @@ def main():
                                   compounds=train_deep_tf['compounds'],
                                   genes=train_deep_tf['genes'],
                                   batch_size=args.batch_size,
-                                  num_workers=1,
+                                  num_workers=2,
                                   drop_last=False,
                                   shuffle=True,
                                   train=True)
@@ -222,7 +215,7 @@ def main():
                                   compounds=valid_deep_tf['compounds'],
                                   genes=valid_deep_tf['genes'],
                                   batch_size=args.batch_size,
-                                  num_workers=1,
+                                  num_workers=2,
                                   drop_last=False,
                                   shuffle=False,
                                   train=True)
@@ -236,8 +229,8 @@ def main():
     # Setup loss and optimizer
     criterion = torch.nn.MSELoss()
     optimizer = torch.optim.AdamW([param for param in model.parameters() if param.requires_grad == True],
-                                 lr=args.lr,
-                                 weight_decay=1e-4)
+                                  lr=args.lr,
+                                  weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, 'min', min_lr=1e-5)
 
@@ -271,11 +264,11 @@ def main():
         if valid_mrrmse < best_valid_mrrmse:
             best_valid_mrrmse = valid_mrrmse
             state = {'state_dict': model.state_dict(),
-                     'train_loss': train_loss,
-                     'valid_loss': valid_loss,
-                     'train_mrrmse': train_mrrmse,
-                     'valid_mrrmse': valid_mrrmse,
-                     'epoch': epoch}
+                    'train_loss': train_loss,
+                    'valid_loss': valid_loss,
+                    'train_mrrmse': train_mrrmse,
+                    'valid_mrrmse': valid_mrrmse,
+                    'epoch': epoch}
             torch.save(state, model_path)
 
         scheduler.step(valid_loss)
