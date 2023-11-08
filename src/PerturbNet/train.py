@@ -6,12 +6,13 @@ import pandas as pd
 import warnings
 import torch
 import logging
-from datetime import datetime
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 
 from sklearn.preprocessing import StandardScaler
 
-from model import PerturbNet, PerturbNet2
+from model import PerturbNet
 from dataset import get_dataloader
 from utils import set_seed, compute_mrrmse
 import config
@@ -31,29 +32,27 @@ def parse_args():
     # Required parameters
     parser.add_argument("--valid_cell_type", type=str, default='nk',
                         help="Which cell type used for validation. Available options are: nk,  t_cd4, t_cd8, t_reg")
-    parser.add_argument("--log",
-                        action="store_true",
-                        help='write training history')
-    parser.add_argument("--resume",
-                        action="store_true",
-                        help='training model from check point')
-    parser.add_argument("--batch_size", default=100, type=int,
+
+    parser.add_argument("--batch_size", default=1000, type=int,
                         help="Batch size. Default 5000")
+
     parser.add_argument("--epochs", default=100, type=int,
                         help="Total number of training epochs to perform. Default: 100")
+
+    parser.add_argument("--n_hiddens", default=2048, type=int,
+                        help="Number of hidden features. Default: 2048")
+
     parser.add_argument("--lr", default=3e-04, type=float,
                         help="Learning rate. Default: 0.001")
+
     parser.add_argument("--seed", type=int, default=42,
                         help="random seed for initialization")
-    
+
     parser.add_argument('--deep_tf',
                         choices=['v1', 'v2', 'v3', 'v4'],
                         type=str, default='v1')
 
-    parser.add_argument("--use_ChemBERTa", action="store_true")
     parser.add_argument("--use_rna_pca", action="store_true")
-    parser.add_argument("--use_chemical_fingerprint", action="store_true")
-    parser.add_argument("--scale_feature", action="store_true")
     return parser.parse_args()
 
 
@@ -147,19 +146,6 @@ def main():
     test_x = test_deep_tf['x']
 
     # concatentate molecular features from ChemBERTa
-    if args.use_ChemBERTa:
-        logging.info(f'Loading molecular features from ChemBERTa')
-        train_ChemBERTa = np.load(
-            f"{config.RESULTS_DIR}/ChemBERTa/train_{args.valid_cell_type}.npz")
-        valid_ChemBERTa = np.load(
-            f"{config.RESULTS_DIR}/ChemBERTa/valid_{args.valid_cell_type}.npz")
-        test_ChemBERTa = np.load(
-            f"{config.RESULTS_DIR}/ChemBERTa/test.npz")
-
-        train_x = np.concatenate([train_x, train_ChemBERTa['x']], axis=1)
-        valid_x = np.concatenate([valid_x, valid_ChemBERTa['x']], axis=1)
-        test_x = np.concatenate([test_x, test_ChemBERTa['x']], axis=1)
-
     if args.use_rna_pca:
         logging.info(f'Loading cell type UMAP features')
         train_cell_type = np.load(
@@ -168,19 +154,6 @@ def main():
             f"{config.RESULTS_DIR}/cell_type_embedding_rna/valid_{args.valid_cell_type}.npz")
         test_cell_type = np.load(
             f"{config.RESULTS_DIR}/cell_type_embedding_rna/test.npz")
-
-        train_x = np.concatenate([train_x, train_cell_type['x']], axis=1)
-        valid_x = np.concatenate([valid_x, valid_cell_type['x']], axis=1)
-        test_x = np.concatenate([test_x, test_cell_type['x']], axis=1)
-
-    if args.use_chemical_fingerprint:
-        logging.info(f'Loading chemical fingerprint')
-        train_cell_type = np.load(
-            f"{config.RESULTS_DIR}/chemical_fingerprint/train_{args.valid_cell_type}.npz")
-        valid_cell_type = np.load(
-            f"{config.RESULTS_DIR}/chemical_fingerprint/valid_{args.valid_cell_type}.npz")
-        test_cell_type = np.load(
-            f"{config.RESULTS_DIR}/chemical_fingerprint/test.npz")
 
         train_x = np.concatenate([train_x, train_cell_type['x']], axis=1)
         valid_x = np.concatenate([valid_x, valid_cell_type['x']], axis=1)
@@ -204,7 +177,7 @@ def main():
                                   compounds=train_deep_tf['compounds'],
                                   genes=train_deep_tf['genes'],
                                   batch_size=args.batch_size,
-                                  num_workers=2,
+                                  num_workers=5,
                                   drop_last=False,
                                   shuffle=True,
                                   train=True)
@@ -215,29 +188,31 @@ def main():
                                   compounds=valid_deep_tf['compounds'],
                                   genes=valid_deep_tf['genes'],
                                   batch_size=args.batch_size,
-                                  num_workers=2,
+                                  num_workers=5,
                                   drop_last=False,
                                   shuffle=False,
                                   train=True)
 
-    # Setup model
-    model = PerturbNet(n_input=train_x.shape[1])
+    # Setup model    
+    model_name = f'{args.valid_cell_type}_deep_tf_{args.deep_tf}_bs_{args.batch_size}_seed_{args.seed}_n_hiddens_{args.n_hiddens}'
+
+    if args.use_rna_pca:
+        model_name = f'{model_name}_rna_pca'
+
+    model = PerturbNet(n_input=train_x.shape[1],
+                       n_hiddens=args.n_hiddens)
+
     model_path = os.path.join(config.MODEL_PATH,
-                              f'{args.valid_cell_type}.pth')
+                              f'{model_name}.pth')
     model.to(device)
 
     # Setup loss and optimizer
     criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.AdamW([param for param in model.parameters() if param.requires_grad == True],
-                                  lr=args.lr,
-                                  weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, 'min', min_lr=1e-5)
+    optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
+    scheduler = ReduceLROnPlateau(optimizer, 'min', min_lr=1e-5)
 
     """ Train the model """
-    dt_string = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-    log_dir = os.path.join(config.TRAINING_LOG_PATH,
-                           f'{args.valid_cell_type}_{dt_string}')
+    log_dir = os.path.join(config.TRAINING_LOG_PATH, f'{model_name}')
     tb_writer = SummaryWriter(log_dir=log_dir)
 
     logging.info(f'Training started')
@@ -264,11 +239,11 @@ def main():
         if valid_mrrmse < best_valid_mrrmse:
             best_valid_mrrmse = valid_mrrmse
             state = {'state_dict': model.state_dict(),
-                    'train_loss': train_loss,
-                    'valid_loss': valid_loss,
-                    'train_mrrmse': train_mrrmse,
-                    'valid_mrrmse': valid_mrrmse,
-                    'epoch': epoch}
+                     'train_loss': train_loss,
+                     'valid_loss': valid_loss,
+                     'train_mrrmse': train_mrrmse,
+                     'valid_mrrmse': valid_mrrmse,
+                     'epoch': epoch}
             torch.save(state, model_path)
 
         scheduler.step(valid_loss)

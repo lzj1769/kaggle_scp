@@ -30,7 +30,7 @@ def parse_args():
                         help="Batch size. Default 5000")
     parser.add_argument("--epochs", default=200, type=int,
                         help="Total number of training epochs to perform. Default: 100")
-    parser.add_argument("--lr", default=3e-04, type=float,
+    parser.add_argument("--lr", default=1e-03, type=float,
                         help="Learning rate. Default: 0.001")
     parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
 
@@ -110,7 +110,7 @@ def main():
     optimizer = torch.optim.AdamW([param for param in model.parameters() if param.requires_grad == True],
                                  lr=args.lr,
                                  weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.2)
 
     """ Train the model """
     dt_string = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")

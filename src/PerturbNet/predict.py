@@ -31,15 +31,21 @@ def parse_args():
     parser.add_argument('--deep_tf', 
                         choices=['v1', 'v2', 'v3', 'v4'],
                         type=str, default='v1')
-    parser.add_argument("--use_ChemBERTa", action="store_true", default=False,
-                        help="If use features from ChemBERTa")
-    parser.add_argument("--scale_feature", action="store_true", default=True,
-                        help="If standardize the input features. Default: True")
-    parser.add_argument("--use_cell_type_umap", action="store_true",
-                        help="If use features from UMAP for cell types")
-    parser.add_argument("--use_chemical_fingerprint", action="store_true")
+    
+    parser.add_argument("--batch_size", default=1000, type=int,
+                        help="Batch size. Default 5000")
+
+    parser.add_argument("--epochs", default=100, type=int,
+                        help="Total number of training epochs to perform. Default: 100")
+
+    parser.add_argument("--n_hiddens", default=2048, type=int,
+                        help="Number of hidden features. Default: 2048")
+
     parser.add_argument("--seed", type=int, default=42,
                         help="random seed for initialization")
+
+    parser.add_argument("--use_rna_pca", action="store_true")
+    
     return parser.parse_args()
 
 
@@ -80,45 +86,19 @@ def main():
         train_x, valid_x, test_x = train_deep_tf['x'], valid_deep_tf['x'], test_deep_tf['x']
 
         # concatentate molecular features from ChemBERTa
-        if args.use_ChemBERTa:
-            logging.info(f'Loading molecular features from ChemBERTa')
-            train_ChemBERTa = np.load(
-                f"{config.RESULTS_DIR}/ChemBERTa/train_{cell_type}.npz")
-            valid_ChemBERTa = np.load(
-                f"{config.RESULTS_DIR}/ChemBERTa/valid_{cell_type}.npz")
-            test_ChemBERTa = np.load(
-                f"{config.RESULTS_DIR}/ChemBERTa/test.npz")
-
-            train_x = np.concatenate([train_x, train_ChemBERTa['x']], axis=1)
-            valid_x = np.concatenate([valid_x, valid_ChemBERTa['x']], axis=1)
-            test_x = np.concatenate([test_x, test_ChemBERTa['x']], axis=1)
-        
-        if args.use_cell_type_umap:
-            logging.info(f'Loading cell type UMAP features')
+        if args.use_rna_pca:
+            logging.info(f'Loading cell type RNA PCA')
             train_cell_type = np.load(
-                f"{config.RESULTS_DIR}/cell_type_umap/train_{cell_type}.npz")
+                f"{config.RESULTS_DIR}/cell_type_embedding_rna/train_{cell_type}.npz")
             valid_cell_type = np.load(
-                f"{config.RESULTS_DIR}/cell_type_umap/valid_{cell_type}.npz")
+                f"{config.RESULTS_DIR}/cell_type_embedding_rna/valid_{cell_type}.npz")
             test_cell_type = np.load(
-                f"{config.RESULTS_DIR}/cell_type_umap/test.npz")
+                f"{config.RESULTS_DIR}/cell_type_embedding_rna/test.npz")
 
             train_x = np.concatenate([train_x, train_cell_type['x']], axis=1)
             valid_x = np.concatenate([valid_x, valid_cell_type['x']], axis=1)
             test_x = np.concatenate([test_x, test_cell_type['x']], axis=1)
             
-        if args.use_chemical_fingerprint:
-            logging.info(f'Loading chemical fingerprint')
-            train_cell_type = np.load(
-                f"{config.RESULTS_DIR}/chemical_fingerprint/train_{cell_type}.npz")
-            valid_cell_type = np.load(
-                f"{config.RESULTS_DIR}/chemical_fingerprint/valid_{cell_type}.npz")
-            test_cell_type = np.load(
-                f"{config.RESULTS_DIR}/chemical_fingerprint/test.npz")
-
-            train_x = np.concatenate([train_x, train_cell_type['x']], axis=1)
-            valid_x = np.concatenate([valid_x, valid_cell_type['x']], axis=1)
-            test_x = np.concatenate([test_x, test_cell_type['x']], axis=1)
-
         logging.info('Standarizing the features')
         scaler = StandardScaler()
         scaler.fit(X=np.concatenate([train_x, valid_x, test_x], axis=0))
@@ -134,9 +114,12 @@ def main():
                                      train=False)
 
         # Setup model
-        model = PerturbNet(n_input=test_x.shape[1])
+        model_name = f'{cell_type}_deep_tf_{args.deep_tf}_bs_{args.batch_size}_seed_{args.seed}_n_hiddens_{args.n_hiddens}.pth'
+        
+        model = PerturbNet(n_input=test_x.shape[1], n_hiddens=args.n_hiddens)
+        
         model_path = os.path.join(config.MODEL_PATH,
-                                  f'{cell_type}.pth')
+                                  f'{model_name}.pth')
 
         state_dict = torch.load(model_path)
         model.load_state_dict(state_dict['state_dict'])
@@ -159,7 +142,7 @@ def main():
         df_test['predict'] = np.concatenate(preds)
         df_submission = get_submission(df_test)
 
-        filename = f'{cell_type}_valid_mrrmse_{valid_mrrmse:.03f}.csv'
+        filename = f'{model_name}_valid_mrrmse_{valid_mrrmse:.03f}.csv'
         df_submission.to_csv(f"{config.SUBMISSION_PATH}/{filename}")
 
         df_submission_list.append(df_submission)
@@ -173,7 +156,7 @@ def main():
     df_avg_submission = sum(
         df_submission_list) / len(df_submission_list)
 
-    filename = f'avg_valid_mrrmse_{avg_valid_mrrmse:.03f}.csv'
+    filename = f'deep_tf_{args.deep_tf}_bs_{args.batch_size}_seed_{args.seed}_n_hiddens_{args.n_hiddens}_valid_mrrmse_{avg_valid_mrrmse:.03f}.csv'
     df_avg_submission.to_csv(f"{config.SUBMISSION_PATH}/{filename}")
 
 
