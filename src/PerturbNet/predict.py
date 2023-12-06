@@ -114,7 +114,7 @@ def main():
                                      train=False)
 
         # Setup model
-        model_name = f'{cell_type}_deep_tf_{args.deep_tf}_bs_{args.batch_size}_seed_{args.seed}_n_hiddens_{args.n_hiddens}.pth'
+        model_name = f'{cell_type}_deep_tf_{args.deep_tf}_bs_{args.batch_size}_seed_{args.seed}_n_hiddens_{args.n_hiddens}'
         
         model = PerturbNet(n_input=test_x.shape[1], n_hiddens=args.n_hiddens)
         

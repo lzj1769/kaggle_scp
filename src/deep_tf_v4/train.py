@@ -28,7 +28,7 @@ def parse_args():
     # Required parameters
     parser.add_argument("--batch_size", default=50000, type=int,
                         help="Batch size. Default 5000")
-    parser.add_argument("--epochs", default=200, type=int,
+    parser.add_argument("--epochs", default=100, type=int,
                         help="Total number of training epochs to perform. Default: 100")
     parser.add_argument("--lr", default=1e-03, type=float,
                         help="Learning rate. Default: 0.001")
@@ -110,7 +110,6 @@ def main():
     optimizer = torch.optim.AdamW([param for param in model.parameters() if param.requires_grad == True],
                                  lr=args.lr,
                                  weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.2)
 
     """ Train the model """
     dt_string = datetime.now().strftime("%d_%m_%Y_%H_%M_%S")
@@ -134,8 +133,6 @@ def main():
                  'train_loss': train_loss,
                  'train_mrrmse': train_mrrmse}
         torch.save(state, model_path)
-        
-        scheduler.step()
         
     logging.info(f'Training finished')
  
